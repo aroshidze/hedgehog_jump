@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hedgehog Jump Deluxe - Visual Overhaul</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #3498db; 
+            font-family: 'Press Start 2P', cursive;
+            overscroll-behavior: none; 
+        }
+        #gameContainer {
+            position: fixed; 
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* Enhanced Sky Gradient */
+            background: linear-gradient(to bottom, #4A90E2 0%, #76D7C4 40%, #F7DC6F 70%, #E67E22 100%); 
+            transition: transform 0.05s ease-out; 
+        }
+        canvas {
+            display: block;
+            background-color: transparent; 
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            border-radius: 10px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3); /* Softer, deeper shadow */
+        }
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.88); /* Slightly more opaque for better contrast */
+            z-index: 10; 
+            padding: 20px;
+            box-sizing: border-box; 
+            opacity: 0; /* For fade-in transition */
+            animation: fadeInScreen 0.5s ease-out forwards;
+        }
+        @keyframes fadeInScreen {
+            to { opacity: 1; }
+        }
+        .screen.hidden {
+            display: none !important; /* Keep hidden class behavior */
+        }
+
+        .screen h1 { 
+            margin-bottom: 1rem; 
+            text-shadow: 4px 4px 0px #d35400, 6px 6px 0px rgba(0,0,0,0.25); /* Enhanced shadow */
+        }
+        .screen p { 
+            margin-bottom: 1.5rem; 
+            line-height: 1.7;
+        }
+        .button {
+            background-image: linear-gradient(to bottom, #58D68D, #28B463); /* More vibrant green */
+            color: white;
+            border: none; border-radius: 12px; cursor: pointer;
+            box-shadow: 0 7px #1D8348; 
+            transition: all 0.08s ease-in-out;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 1.5px;
+        }
+        .button:hover { 
+            background-image: linear-gradient(to bottom, #48C9B0, #1ABC9C);
+            box-shadow: 0 5px #148F77;
+            transform: translateY(2px) scale(1.02);
+        }
+        .button:active { 
+            transform: translateY(6px) scale(0.98); 
+            box-shadow: 0 2px #148F77;
+        }
+        #scoreDisplay, #highScoreDisplayStart, #highScoreDisplayGameOver, #powerUpTimerDisplay {
+            position: absolute; 
+            padding: 10px 15px; 
+            background-color: rgba(0,0,0,0.75); 
+            border-radius: 8px;
+            color: white;
+            text-shadow: 2px 2px 2px rgba(0,0,0,0.8);
+            z-index: 5;
+            border: 2px solid rgba(255,255,255,0.45);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        #scoreDisplay { top: 15px; left: 15px; }
+        #highScoreDisplayStart { top: 15px; right: 15px; }
+        #highScoreDisplayGameOver { margin-top: 15px; background-color: transparent; border: none;}
+        #powerUpTimerDisplay { 
+            bottom: 15px; 
+            left: 15px; 
+            background-color: rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .touch-control {
+            position: absolute; bottom: 0;
+            width: 50%; height: 100%;
+            z-index: 1; 
+        }
+        #touchLeft { left: 0; }
+        #touchRight { right: 0; }
+        .hidden { display: none !important; }
+        #criticalErrorDisplay {
+            position: absolute;
+            top: 10px; left: 10px; right: 10px;
+            padding: 15px;
+            background-color: #ff4757;
+            color: white;
+            border: 2px solid #c0392b;
+            border-radius: 5px;
+            z-index: 2000;
+            font-size: 14px;
+            white-space: pre-wrap; 
+        }
+        .combo-popup {
+            position: absolute;
+            left: 50%;
+            top: 20%;
+            transform: translateX(-50%) translateY(10px); /* Start slightly lower for pop-up */
+            font-size: 2.8rem; /* Base size, responsive classes can adjust */
+            color: #FAD02E; /* Brighter Gold */
+            text-shadow: 3px 3px 0 #F39C12, 5px 5px 0 rgba(0,0,0,0.3); /* Stronger Orange shadow */
+            opacity: 0;
+            transition: opacity 0.4s ease-out, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Pop effect */
+            pointer-events: none;
+            z-index: 100;
+        }
+        .combo-popup.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-25px) scale(1.15); /* Pop up and scale */
+        }
+    </style>
+</head>
+<body class="bg-blue-500">
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="criticalErrorDisplay" class="hidden"></div> 
+        <div id="startScreen" class="screen">
+            <h1 class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-yellow-300 mb-2 sm:mb-3 md:mb-4 lg:mb-6">Hedgehog Jump Supreme!</h1>
+            <p class="text-sm sm:text-base md:text-lg lg:text-xl mb-4 sm:mb-5 md:mb-6 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg">New Foes, Power-ups & Tricky Platforms!</p>
+            <p class="text-xs sm:text-sm md:text-base lg:text-lg mb-1 sm:mb-2 md:mb-3 max-w-xs sm:max-w-sm md:max-w-md">Collect Stars, Use Shields & Magnets, Dodge Buzzbugs!</p>
+            <p class="text-xs sm:text-sm md:text-base mb-3 sm:mb-4 md:mb-6 max-w-xs">Controls: A/D or Left/Right Arrows.</p>
+            <button id="startGameButton" class="button text-sm sm:text-base md:text-lg lg:text-xl py-2 px-3 sm:py-2 sm:px-4 md:py-3 md:px-6">Start Game</button>
+            <div id="highScoreDisplayStart" class="hidden text-xs sm:text-sm mt-3 md:mt-4">High Score: 0</div>
+        </div>
+        <div id="gameOverScreen" class="screen hidden">
+            <h1 class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-red-500 mb-2 sm:mb-3 md:mb-4 lg:mb-6">Game Over!</h1>
+            <p id="finalScore" class="text-base sm:text-lg md:text-xl lg:text-2xl mb-2 sm:mb-3 md:mb-4">Your Score: 0</p>
+            <div id="highScoreDisplayGameOver" class="text-sm sm:text-base md:text-lg lg:text-xl">High Score: 0</div>
+            <button id="playAgainButton" class="button text-sm sm:text-base md:text-lg lg:text-xl py-2 px-3 sm:py-2 sm:px-4 md:py-3 md:px-6 mt-4 sm:mt-5 md:mt-6">Play Again</button>
+        </div>
+        <div id="scoreDisplay" class="hidden text-xs sm:text-sm md:text-base">Score: 0</div>
+        <div id="powerUpTimerDisplay" class="hidden text-xs sm:text-sm"></div>
+        <div id="touchLeft" class="touch-control hidden"></div>
+        <div id="touchRight" class="touch-control hidden"></div>
+        <div id="comboPopup" class="combo-popup text-xl sm:text-2xl md:text-3xl">Combo!</div>
+    </div>
+
+    <script>
+        // --- Asset URLs ---
+        const HEDGEHOG_SPRITE_URL = 'https://i.imgur.com/FgFdWlg.png'; 
+        
+        const STAR_SPRITE_URLS = [
+            'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/star1.png',
+            'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/star2.png',
+            'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/star3.png'
+        ];
+        const SHIELD_ICON_URL = 'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/small-shield.png';
+
+        // --- Platform Sprite URLs ---
+        const PLATFORM_SPRITE_GRASS_URL = 'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/grass.png';
+        const PLATFORM_SPRITE_STONE_URL = 'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/stone.png';
+        const PLATFORM_SPRITE_WOODEN_URL = 'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/wooden.png';
+        const PLATFORM_SPRITE_JUMPING_URL = 'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/jumping.png';
+        const PLATFORM_SPRITE_MOVING_URL = 'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/moving.png';
+        const PLATFORM_SPRITE_FRAGILE_URL = 'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/fragile.png';
+        const PLATFORM_SPRITE_GLASS_URL = 'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/glass.png';
+        const PLATFORM_SPRITE_SPIKES_OPEN_URL = 'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/spikes1.png';
+        const PLATFORM_SPRITE_SPIKES_CLOSED_URL = 'https://raw.githubusercontent.com/aroshidze/hedgehog_jump/refs/heads/main/spikes2.png';
+
+
+        // --- Platform Colors (kept for particles or other non-sprite elements if needed) ---
+        const PLATFORM_COLORS = { 
+            normal_grass: { main: '#689F38', accent: '#8BC34A', detail: '#33691E', topDetail: '#AED581' }, 
+            normal_wood: { main: '#795548', accent: '#A1887F', detail: '#4E342E', topDetail: '#BCAAA4' },   
+            normal_stone: { main: '#616161', accent: '#9E9E9E', detail: '#212121', topDetail: '#BDBDBD' },  
+            bouncy: { main: '#00C853', accent: '#69F0AE', detail: '#007E33', topDetail: '#A5D6A7' },       
+            moving: { main: '#607D8B', accent: '#90A4AE', detail: '#37474F', topDetail: '#B0BEC5' },       
+            fragile: { main: '#FFB74D', accent: '#FFCC80', detail: '#E65100', topDetail: '#FFE0B2' },
+            disappearing: { main: '#4FC3F7', accent: '#81D4FA', detail: '#0288D1', topDetail: '#B3E5FC'}, 
+            spiky: { main: '#757575', accent: '#F44336', detail: '#424242', topDetail: '#BDBDBD' } 
+        };
+        const STAR_COLOR_INNER = '#FFFDE7'; 
+        const STAR_COLOR_OUTER = '#FFD600'; 
+        const STAR_OUTLINE_COLOR = '#FFA000'; 
+
+        // --- Power-up Colors ---
+        const SHIELD_POWERUP_COLOR = '#29B6F6'; 
+        const SHIELD_ACTIVE_COLOR = 'rgba(3, 169, 244, 0.45)'; 
+        const MAGNET_POWERUP_COLOR = '#F06292'; 
+        const MAGNET_ACTIVE_COLOR = 'rgba(240, 98, 146, 0.3)'; 
+        const SUPER_JUMP_POWERUP_COLOR = '#FFEB3B'; 
+
+        // --- Enemy Colors ---
+        const BUZZBUG_BODY_COLOR = '#212121'; 
+        const BUZZBUG_WING_COLOR = 'rgba(200, 200, 255, 0.7)';
+        const BUZZBUG_HOVER_WARN_COLOR = '#c0392b'; 
+        
+        const EAGLE_BODY_COLOR = '#5D4037'; 
+        const EAGLE_WING_COLOR = '#A1887F'; 
+        const EAGLE_BEAK_COLOR = '#FFC107';
+
+
+        // --- Game Element Variables (declared globally, assigned in init) ---
+        let canvas, ctx, startScreen, gameOverScreen, scoreDisplay, finalScoreDisplay, 
+            highScoreDisplayStart, highScoreDisplayGameOver, startGameButton, playAgainButton, 
+            touchLeft, touchRight, gameContainer, powerUpTimerDisplayElement, comboPopupElement; 
+
+        // --- Game State & Variables ---
+        let gameState = 'start'; 
+        let score = 0;
+        let highScore = localStorage.getItem('hedgehogJumpHighScore') || 0;
+        let cameraY = 0;
+        let maxReachedY = 0; 
+        let hedgehogImg; 
+        let shieldIconImg;
+        let starImgs = []; 
+        let currentStarFrame = 0;
+        let starAnimationTimer = 0;
+        const STAR_ANIMATION_SPEED = 10; 
+
+        // Platform Sprite Image Variables
+        let platformGrassImg, platformStoneImg, platformWoodenImg, platformJumpingImg,
+            platformMovingImg, platformFragileImg, platformGlassImg,
+            platformSpikesOpenImg, platformSpikesClosedImg;
+
+        // --- Audio Variables ---
+        let jumpSound, gameOverSound, collectStarSound, landSound, bouncyLandSound, breakSound, walkSound, shieldActivateSound, shieldBreakSound, powerupSpawnSound, hurtSound, shieldDeflectSound, magnetActivateSound, magnetActiveHumSound, buzzbugZapSound, disappearingPlatformSound, superJumpCollectSound, superJumpUseSound, windSound, comboSound, eagleScreechSound;
+        let gameLoopRequestId; 
+        let lastTime = 0; 
+        let walkSoundTimer = 0; 
+        const WALK_SOUND_INTERVAL = 180; 
+        let particles = []; 
+        let powerUps = []; 
+        let enemies = []; 
+        let lastSpecialPlatformY = 0; 
+        const MIN_SPECIAL_PLATFORM_DISTANCE = 200; 
+        let nextPlatformY = 0; 
+        const initialPlatformCount = 15; 
+
+        // --- Game Constants ---
+        const REFERENCE_GAME_HEIGHT = 800; 
+        let gameScale = 1; 
+
+        const GRAVITY_BASE = 0.9; 
+        const HEDGEHOG_JUMP_FORCE_BASE = -21; 
+        const HEDGEHOG_BOUNCY_JUMP_FORCE_BASE = -35; 
+        const HEDGEHOG_SUPER_JUMP_FORCE_BASE = -40; 
+        const HEDGEHOG_MOVE_SPEED_BASE = 8;
+        const PLATFORM_HEIGHT_BASE = 35; // Slightly increased platform height
+        const PLATFORM_MIN_WIDTH_BASE = 110; // Slightly increased platform min width
+        const PLATFORM_MAX_WIDTH_BASE = 220; // Slightly increased platform max width
+        const PLATFORM_SPAWN_MIN_Y_OFFSET_BASE = 65; 
+        const PLATFORM_SPAWN_MAX_Y_OFFSET_BASE = 130; 
+        const PLATFORM_HORIZONTAL_RANGE_FACTOR = 0.85;
+        
+        const SPRITE_FRAME_WIDTH = 32; 
+        const SPRITE_FRAME_HEIGHT = 32;
+        const ORIGINAL_SPRITESHEET_COLUMNS = 4; 
+        const ORIGINAL_SPRITESHEET_ROWS = 4;    
+        const SPRITE_PADDING_X = 1; 
+        const SPRITE_PADDING_Y = 1; 
+
+
+        const HEDGEHOG_RENDER_SCALE_BASE = 2.4; 
+        let HEDGEHOG_WIDTH = (SPRITE_FRAME_WIDTH - 2 * SPRITE_PADDING_X) * HEDGEHOG_RENDER_SCALE_BASE;
+        let HEDGEHOG_HEIGHT = (SPRITE_FRAME_HEIGHT - 2 * SPRITE_PADDING_Y) * HEDGEHOG_RENDER_SCALE_BASE;
+
+        const HEDGEHOG_ANIMATIONS = {
+            idle:   { frames: [4, 5, 6, 7], speed: 5, loop: true },    
+            walk:   { frames: [0, 1, 2, 3], speed: 10, loop: true },   
+            jump:   { frames: [8], speed: 5, loop: false },           
+            in_air: { frames: [9], speed: 1, loop: false },          
+            fall:   { frames: [10, 11], speed: 8, loop: true }       
+        };
+
+        const STAR_RADIUS_BASE = 16; 
+        const STAR_DISPLAY_SIZE_BASE = 32; 
+        const STAR_POINTS = 5; 
+        const STAR_SCORE = 50; 
+        const STAR_Y_OFFSET_ABOVE_PLATFORM_BASE = STAR_RADIUS_BASE + 10; 
+
+        const PLATFORM_TYPE_NORMAL_GRASS = 'normal_grass';
+        const PLATFORM_TYPE_NORMAL_WOOD = 'normal_wood';
+        const PLATFORM_TYPE_NORMAL_STONE = 'normal_stone';
+        const PLATFORM_TYPE_BOUNCY = 'bouncy';
+        const PLATFORM_TYPE_MOVING = 'moving';
+        const PLATFORM_TYPE_FRAGILE = 'fragile';
+        const PLATFORM_TYPE_SPIKY = 'spiky'; 
+        const PLATFORM_TYPE_DISAPPEARING = 'disappearing'; 
+        const NORMAL_PLATFORM_TYPES = [PLATFORM_TYPE_NORMAL_GRASS, PLATFORM_TYPE_NORMAL_WOOD, PLATFORM_TYPE_NORMAL_STONE];
+
+        const MOVING_PLATFORM_SPEED_BASE = 2.2;
+        const FRAGILE_PLATFORM_BREAK_DELAY = 180; 
+        const DISAPPEARING_PLATFORM_CYCLE = 3000; 
+        const DISAPPEARING_PLATFORM_ON_DURATION = 1500; 
+
+        const POWERUP_SPAWN_CHANCE = 0.10; 
+        const POWERUP_SHIELD = 'shield';
+        const POWERUP_MAGNET = 'magnet';
+        const POWERUP_SUPER_JUMP = 'super_jump';
+        const SHIELD_DURATION = 7000; 
+        const MAGNET_DURATION = 8000; 
+        const MAGNET_RADIUS_BASE = 180; 
+        const POWERUP_ICON_SIZE_BASE = 30;
+
+        const SPIKY_PLATFORM_APPEAR_SCORE = 250; 
+        const BUZZBUG_SPAWN_SCORE = 450; 
+        let BUZZBUG_SPAWN_CHANCE_BASE = 0.01; 
+        const BUZZBUG_SPAWN_CHANCE_MAX = 0.05;
+        const BUZZBUG_SPEED_BASE = 2.8;
+        const BUZZBUG_SIZE_BASE = 28;
+        const MAX_BUZZBUGS_ON_SCREEN = 3;
+        let buzzbugSpawnCooldown = 0;
+        const BUZZBUG_SPAWN_COOLDOWN_TIME = 2000; 
+
+        const EAGLE_SPAWN_SCORE = 350; 
+        const EAGLE_SPAWN_CHANCE = 0.03; 
+        const EAGLE_SPEED_BASE = 1.8; 
+        const EAGLE_WIDTH_BASE = 60;
+        const EAGLE_HEIGHT_BASE = 40;
+        const MAX_EAGLES = 1; 
+        let eagleSpawnCooldown = 0;
+        const EAGLE_COOLDOWN_TIME = 5000; 
+
+        const WIND_ZONE_SPAWN_SCORE = 600;
+        const WIND_ZONE_CHANCE = 0.015; 
+        let currentWindForce = 0;
+        const MAX_WIND_FORCE_BASE = 1.0; 
+        let windZoneActive = false;
+        let windChangeTimer = 0;
+        const WIND_DURATION_MIN = 3000; 
+        const WIND_DURATION_MAX = 7000; 
+
+        let comboCounter = 0;
+        let lastStarCollectTime = 0;
+        const COMBO_WINDOW = 2000; 
+        const COMBO_BONUS_POINTS = 25;
+        let comboPopupTimeout;
+
+        let ambientMusic; 
+
+        // --- Input Handling (defined before init) ---
+        const keys = { ArrowLeft: false, ArrowRight: false, a: false, d: false };
+        const touchState = { left: false, right: false };
+
+        function handleKeyDown(e) {
+            const key = e.key.toLowerCase();
+            if (key === 'arrowleft') keys.ArrowLeft = true;
+            if (key === 'arrowright') keys.ArrowRight = true;
+            if (key === 'a') keys.a = true;
+            if (key === 'd') keys.d = true;
+        }
+        function handleKeyUp(e) {
+            const key = e.key.toLowerCase();
+            if (key === 'arrowleft') keys.ArrowLeft = false;
+            if (key === 'arrowright') keys.ArrowRight = false;
+            if (key === 'a') keys.a = false;
+            if (key === 'd') keys.d = false;
+        }
+        function handleTouchStart(e) {
+            if (gameState !== 'playing') return; 
+            e.preventDefault(); const touchX = e.touches[0].clientX;
+            touchState.left = (touchX < window.innerWidth / 2); touchState.right = !touchState.left;
+        }
+        function handleTouchEnd(e) {
+            if (gameState !== 'playing') return; 
+            e.preventDefault(); let stillLeft = false, stillRight = false;
+            if (e.touches.length > 0) {
+                for (let i = 0; i < e.touches.length; i++) { if (e.touches[i].clientX < window.innerWidth / 2) stillLeft = true; else stillRight = true; }
+            }
+            touchState.left = stillLeft; touchState.right = stillRight;
+            if(e.touches.length === 0){ touchState.left = false; touchState.right = false; }
+        }
+
+
+        // --- Player (Hedgehog) Object ---
+        const hedgehog = {
+            x: 0, y: 0, width: HEDGEHOG_WIDTH, height: HEDGEHOG_HEIGHT, 
+            dx: 0, dy: 0, onGround: false,
+            facingRight: true,
+            visualState: 'idle', 
+            currentFrameIndex: 0, 
+            animationTimer: 0,
+            currentPlatform: null, 
+            hasShield: false,
+            shieldTimer: 0,
+            hasMagnet: false,
+            magnetTimer: 0,
+            hasNextJumpSuper: false, 
+
+            update: function(deltaTime) {
+                let isMovingHorizontally = false;
+                const effectiveMoveSpeed = HEDGEHOG_MOVE_SPEED_BASE * gameScale;
+                if (keys.ArrowLeft || keys.a) {
+                    this.dx = -effectiveMoveSpeed; this.facingRight = false; isMovingHorizontally = true;
+                } else if (keys.ArrowRight || keys.d) {
+                    this.dx = effectiveMoveSpeed; this.facingRight = true; isMovingHorizontally = true;
+                } else if (touchState.left && gameState === 'playing') { 
+                    this.dx = -effectiveMoveSpeed; this.facingRight = false; isMovingHorizontally = true;
+                } else if (touchState.right && gameState === 'playing') { 
+                    this.dx = effectiveMoveSpeed; this.facingRight = true; isMovingHorizontally = true;
+                } else {
+                    this.dx = 0;
+                }
+                
+                if (windZoneActive) {
+                    this.x += currentWindForce * (deltaTime * 60); 
+                }
+
+                if (this.onGround && this.currentPlatform && this.currentPlatform.type === PLATFORM_TYPE_MOVING) {
+                    this.x += (this.currentPlatform.vx) * deltaTime * 60; 
+                }
+                this.x += this.dx;
+
+                this.dy += GRAVITY_BASE * gameScale;
+                this.y += this.dy;
+
+                if (!this.onGround) {
+                    this.visualState = (this.dy < -0.1 * gameScale) ? 'jump' : 'fall'; 
+                } else {
+                    this.visualState = isMovingHorizontally ? 'walk' : 'idle';
+                }
+
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+                
+                const newAnimData = HEDGEHOG_ANIMATIONS[this.visualState]; 
+                if (newAnimData) { 
+                    this.animationTimer += deltaTime * newAnimData.speed;
+                    if (this.animationTimer >= 1) {
+                        this.animationTimer = 0;
+                        if (newAnimData.loop || this.currentFrameIndex < newAnimData.frames.length - 1) {
+                           this.currentFrameIndex = (this.currentFrameIndex + 1) % newAnimData.frames.length;
+                        } else if (!newAnimData.loop && this.visualState === 'jump') { 
+                            this.visualState = 'in_air'; 
+                            this.currentFrameIndex = 0; 
+                        }
+                    }
+                } else { 
+                    this.visualState = 'idle'; 
+                    this.currentFrameIndex = 0;
+                }
+
+                if (this.hasShield) {
+                    this.shieldTimer -= deltaTime * 1000;
+                    if (this.shieldTimer <= 0) {
+                        this.hasShield = false;
+                        playSound(shieldBreakSound); 
+                        createParticleEffect(this.x + this.width / 2, this.y + this.height / 2, SHIELD_POWERUP_COLOR, 20, 3 * gameScale, 2 * gameScale, 40);
+                    }
+                }
+                if (this.hasMagnet) {
+                    this.magnetTimer -= deltaTime * 1000;
+                    if (this.magnetTimer <= 0) {
+                        this.hasMagnet = false;
+                    }
+                }
+            },
+            draw: function() { 
+                if (!hedgehogImg || hedgehogImg.naturalWidth === 0) { 
+                    ctx.fillStyle = 'purple'; 
+                    ctx.fillRect(this.x, this.y, this.width, this.height); 
+                    return;
+                }
+                ctx.save();
+                const anim = HEDGEHOG_ANIMATIONS[this.visualState] || HEDGEHOG_ANIMATIONS.idle; 
+                
+                const frameValueFromAnimation = anim.frames[this.currentFrameIndex]; 
+                
+                const frameCol = frameValueFromAnimation % ORIGINAL_SPRITESHEET_COLUMNS;
+                const frameRow = Math.floor(frameValueFromAnimation / ORIGINAL_SPRITESHEET_COLUMNS);
+
+                const sx = frameCol * SPRITE_FRAME_WIDTH + SPRITE_PADDING_X;
+                const sy = frameRow * SPRITE_FRAME_HEIGHT + SPRITE_PADDING_Y;
+                
+                const sWidthClamped = Math.min(SPRITE_FRAME_WIDTH - 2 * SPRITE_PADDING_X, hedgehogImg.naturalWidth - sx);
+                const sHeightClamped = Math.min(SPRITE_FRAME_HEIGHT - 2 * SPRITE_PADDING_Y, hedgehogImg.naturalHeight - sy);
+
+                if (sWidthClamped <= 0 || sHeightClamped <= 0) {
+                    ctx.fillStyle = 'orange'; 
+                    ctx.fillRect(this.facingRight ? this.x : 0, this.facingRight ? this.y : 0, this.width, this.height);
+                    ctx.restore();
+                    return;
+                }
+
+                if (!this.facingRight) {
+                    ctx.translate(this.x + this.width, this.y); ctx.scale(-1, 1);
+                    ctx.drawImage(hedgehogImg, 
+                                  sx, sy, sWidthClamped, sHeightClamped, 
+                                  0, 0, this.width, this.height); 
+                } else {
+                    ctx.drawImage(hedgehogImg, 
+                                  sx, sy, sWidthClamped, sHeightClamped, 
+                                  this.x, this.y, this.width, this.height); 
+                }
+                ctx.restore();
+
+                if (this.hasShield) {
+                    ctx.save();
+                    ctx.globalAlpha = 0.4 + Math.sin(Date.now() / 100) * 0.2; 
+                    ctx.fillStyle = SHIELD_ACTIVE_COLOR;
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width * 0.7, 0, Math.PI * 2); 
+                    ctx.fill();
+                    ctx.strokeStyle = SHIELD_POWERUP_COLOR;
+                    ctx.lineWidth = 3 * gameScale; 
+                    ctx.stroke();
+                    ctx.restore();
+                }
+                if (this.hasMagnet) {
+                    ctx.save();
+                    ctx.globalAlpha = 0.2 + Math.sin(Date.now() / 120) * 0.1;
+                    ctx.fillStyle = MAGNET_ACTIVE_COLOR;
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, (MAGNET_RADIUS_BASE * gameScale) * 0.8, 0, Math.PI * 2); 
+                    ctx.fill();
+                    ctx.strokeStyle = MAGNET_POWERUP_COLOR;
+                    ctx.lineWidth = 1.5 * gameScale;
+                    ctx.setLineDash([5 * gameScale, 5 * gameScale]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.restore();
+                }
+            },
+            jump: function(jumpForce = HEDGEHOG_JUMP_FORCE_BASE * gameScale) {
+                if (this.onGround) {
+                    if (this.hasNextJumpSuper) {
+                        jumpForce = HEDGEHOG_SUPER_JUMP_FORCE_BASE * gameScale;
+                        playSound(superJumpUseSound);
+                        createParticleEffect(this.x + this.width / 2, this.y + this.height, 20, SUPER_JUMP_POWERUP_COLOR, 5 * gameScale, 4 * gameScale, 50);
+                        this.hasNextJumpSuper = false; 
+                    } else {
+                        playSound(jumpSound);
+                    }
+                    this.dy = jumpForce;
+                    this.onGround = false;
+                    this.currentPlatform = null; 
+                    this.visualState = 'jump'; 
+                    this.currentFrameIndex = 0;    
+                    this.animationTimer = 0;
+                    createParticleEffect(this.x + this.width / 2, this.y + this.height, 12, '#A0522D', 4.5 * gameScale, 2.8 * gameScale); 
+                }
+            },
+            activateShield: function() { 
+                this.hasShield = true;
+                this.shieldTimer = SHIELD_DURATION;
+                playSound(shieldActivateSound);
+                createParticleEffect(this.x + this.width/2, this.y + this.height/2, SHIELD_POWERUP_COLOR, 30, 4 * gameScale, 3 * gameScale, 50);
+                console.log("Shield activated!");
+            },
+            activateMagnet: function() { 
+                this.hasMagnet = true;
+                this.magnetTimer = MAGNET_DURATION;
+                playSound(magnetActivateSound);
+                console.log("Magnet activated!");
+            },
+            activateSuperJump: function() {
+                this.hasNextJumpSuper = true;
+                playSound(superJumpCollectSound);
+                createParticleEffect(this.x + this.width/2, this.y + this.height/2, SUPER_JUMP_POWERUP_COLOR, 25, 4 * gameScale, 3.5 * gameScale, 45);
+                console.log("Super Jump activated!");
+            }
+        };
+
+        // --- Platforms ---
+        let platforms = [];
+        
+        function createPlatform(x, y, widthBase, type = PLATFORM_TYPE_NORMAL_GRASS) {
+            let specificProps = {};
+            const effectivePlatformHeight = PLATFORM_HEIGHT_BASE * gameScale; 
+            const effectiveWidth = widthBase * gameScale;
+            let spriteImg = null; 
+
+            switch(type) {
+                case PLATFORM_TYPE_NORMAL_GRASS: spriteImg = platformGrassImg; break;
+                case PLATFORM_TYPE_NORMAL_WOOD: spriteImg = platformWoodenImg; break;
+                case PLATFORM_TYPE_NORMAL_STONE: spriteImg = platformStoneImg; break;
+                case PLATFORM_TYPE_BOUNCY: 
+                    spriteImg = platformJumpingImg; 
+                    specificProps.colorSet = PLATFORM_COLORS.bouncy; 
+                    break;
+                case PLATFORM_TYPE_MOVING:
+                    spriteImg = platformMovingImg;
+                    specificProps.vx = (Math.random() < 0.5 ? -1 : 1) * (MOVING_PLATFORM_SPEED_BASE * gameScale) * (0.8 + Math.random()*0.4);
+                    specificProps.moveRange = (50 * gameScale) + Math.random() * (canvas.width * 0.3); 
+                    specificProps.originalX = x;
+                    specificProps.colorSet = PLATFORM_COLORS.moving;
+                    break;
+                case PLATFORM_TYPE_FRAGILE:
+                    spriteImg = platformFragileImg;
+                    specificProps.isBreaking = false; specificProps.breakTimer = null;
+                    specificProps.opacity = 1.0; 
+                    specificProps.colorSet = PLATFORM_COLORS.fragile;
+                    break;
+                case PLATFORM_TYPE_SPIKY: 
+                    spriteImg = platformSpikesOpenImg; 
+                    specificProps.isDisabled = false; 
+                    specificProps.disabledTimer = 0;
+                    specificProps.colorSet = PLATFORM_COLORS.spiky; 
+                    break;
+                case PLATFORM_TYPE_DISAPPEARING:
+                    spriteImg = platformGlassImg;
+                    specificProps.isVisible = true;
+                    specificProps.timer = Math.random() * DISAPPEARING_PLATFORM_CYCLE; 
+                    specificProps.colorSet = PLATFORM_COLORS.disappearing;
+                    break;
+                default: 
+                    spriteImg = platformGrassImg;
+                    type = PLATFORM_TYPE_NORMAL_GRASS; 
+                    specificProps.colorSet = PLATFORM_COLORS.normal_grass;
+                    break;
+            }
+            
+            let hasPowerUp = false;
+            const powerUpRand = Math.random();
+            if (![PLATFORM_TYPE_BOUNCY, PLATFORM_TYPE_FRAGILE, PLATFORM_TYPE_MOVING, PLATFORM_TYPE_SPIKY, PLATFORM_TYPE_DISAPPEARING].includes(type) && powerUpRand < POWERUP_SPAWN_CHANCE) {
+                hasPowerUp = true;
+                const pTypeRand = Math.random();
+                if (pTypeRand < 0.45) specificProps.powerUpType = POWERUP_SHIELD;
+                else if (pTypeRand < 0.80) specificProps.powerUpType = POWERUP_MAGNET;
+                else specificProps.powerUpType = POWERUP_SUPER_JUMP;
+            }
+
+            const newPlatform = {
+                x, y, width: effectiveWidth, height: effectivePlatformHeight, 
+                spriteImg: spriteImg, 
+                type: type, 
+                isFirst: false, 
+                hasStar: (!hasPowerUp && ![PLATFORM_TYPE_BOUNCY, PLATFORM_TYPE_FRAGILE, PLATFORM_TYPE_MOVING, PLATFORM_TYPE_SPIKY, PLATFORM_TYPE_DISAPPEARING].includes(type) && Math.random() < 0.35),
+                hasPowerUp: hasPowerUp,
+                ...specificProps
+            };
+            // console.log(`CREATE_LOGIC: Platform created. Type: ${newPlatform.type}, Sprite: ${newPlatform.spriteImg ? newPlatform.spriteImg.src.substring(newPlatform.spriteImg.src.lastIndexOf('/') + 1) : 'No Sprite'}, X: ${newPlatform.x.toFixed(2)}, Y: ${newPlatform.y.toFixed(2)}`); // Removed for cleaner console
+            return newPlatform;
+        }
+        
+        function generateInitialPlatforms() { 
+            platforms = []; 
+            const firstPlatformWidthBase = (canvas.width / gameScale) / 3; 
+            const firstPlatformX = (canvas.width / 2) - (firstPlatformWidthBase * gameScale / 2);
+            const firstPlatform = createPlatform(firstPlatformX, canvas.height - (50*gameScale) - (PLATFORM_HEIGHT_BASE*gameScale), firstPlatformWidthBase, PLATFORM_TYPE_NORMAL_GRASS);
+            firstPlatform.isFirst = true;
+            firstPlatform.hasStar = false; 
+            firstPlatform.hasPowerUp = false;
+            platforms.push(firstPlatform);
+
+            hedgehog.x = firstPlatform.x + (firstPlatform.width / 2) - (hedgehog.width / 2);
+            hedgehog.y = firstPlatform.y - hedgehog.height;
+            hedgehog.dy = 0; 
+            hedgehog.onGround = true;
+            hedgehog.currentPlatform = firstPlatform;
+
+            nextPlatformY = firstPlatform.y; 
+            lastSpecialPlatformY = firstPlatform.y; 
+
+            for (let i = 0; i < initialPlatformCount - 1; i++) { 
+                spawnPlatform(false, i); 
+            }
+        }
+
+        // Updated spawnPlatform function with tuned bouncy logic
+        function spawnPlatform(forceNormal = false, spawnIndex = 0) { 
+            let lastPlatformObject; 
+
+            if (platforms.length > 0 && platforms[platforms.length - 1]) {
+                lastPlatformObject = platforms[platforms.length - 1];
+            } else {
+                console.warn("spawnPlatform: Fallback - platforms array empty. Creating a default base platform.");
+                const defaultWidthBase = PLATFORM_MIN_WIDTH_BASE + Math.random() * (PLATFORM_MAX_WIDTH_BASE - PLATFORM_MIN_WIDTH_BASE);
+                const defaultX = (canvas.width / 2) - (defaultWidthBase * gameScale / 2); 
+                const defaultY = cameraY + (canvas.height / gameScale) - (PLATFORM_HEIGHT_BASE * gameScale) - (PLATFORM_SPAWN_MIN_Y_OFFSET_BASE * gameScale); 
+                
+                lastPlatformObject = { x: defaultX, y: defaultY, width: defaultWidthBase * gameScale, type: "fallback_platform_generated" };
+                const emergencyPlatform = createPlatform(defaultX, defaultY, defaultWidthBase, NORMAL_PLATFORM_TYPES[0]);
+                platforms.push(emergencyPlatform);
+                nextPlatformY = defaultY; 
+                return; 
+            }
+            
+            if (!lastPlatformObject || typeof lastPlatformObject.x === 'undefined' || typeof lastPlatformObject.y === 'undefined') {
+                 console.error("SPAWN_PLATFORM: CRITICAL - lastPlatformObject is invalid!", lastPlatformObject);
+                 lastPlatformObject = { x: (canvas.width / 2), y: cameraY + (canvas.height / gameScale / 2), width: 100 * gameScale, type: "absolute_emergency_failsafe" };
+            }
+            
+            const yOffsetScaleFactor = Math.max(0.6, Math.min(1.0, (canvas.height / gameScale) / REFERENCE_GAME_HEIGHT * 1.25)); 
+            const scaledMinYOffset = PLATFORM_SPAWN_MIN_Y_OFFSET_BASE * yOffsetScaleFactor * gameScale;
+            const scaledMaxYOffset = PLATFORM_SPAWN_MAX_Y_OFFSET_BASE * yOffsetScaleFactor * gameScale;
+
+            const newY = lastPlatformObject.y - (scaledMinYOffset + Math.random() * (scaledMaxYOffset - scaledMinYOffset));
+            const newWidthBase = PLATFORM_MIN_WIDTH_BASE + Math.random() * (PLATFORM_MAX_WIDTH_BASE - PLATFORM_MIN_WIDTH_BASE);
+            const currentCanvasWidth = canvas.width; 
+            const maxHorizontalDelta = (currentCanvasWidth / gameScale) * PLATFORM_HORIZONTAL_RANGE_FACTOR / 2;
+            let newX = (lastPlatformObject.x / gameScale) + (lastPlatformObject.width / gameScale / 2) - (newWidthBase / 2) + (Math.random() * maxHorizontalDelta * 2 - maxHorizontalDelta);
+            newX = Math.max(10 / gameScale, Math.min(newX, (currentCanvasWidth / gameScale) - newWidthBase - (10 / gameScale)));
+
+            let platformType;
+            const generalRand = Math.random(); 
+            const challengingPlatformChance = 0.18 + Math.min(0.15, score / 10000); 
+            const spikyChance = 0.07 + Math.min(0.1, score / 15000);
+            const bouncySpecificRand = Math.random(); 
+
+            if (forceNormal || lastPlatformObject.type === "fallback_platform_generated" || lastPlatformObject.type === "absolute_emergency_failsafe") {
+                platformType = NORMAL_PLATFORM_TYPES[Math.floor(Math.random() * NORMAL_PLATFORM_TYPES.length)];
+            } else {
+                // Tuned Bouncy Platform Logic: Lower score threshold, increased chance, maintained spacing
+                if (score > 100 && bouncySpecificRand < 0.15 && Math.abs(newY - lastSpecialPlatformY) > MIN_SPECIAL_PLATFORM_DISTANCE * gameScale * 1.2) {
+                    // console.log(`SPAWN_LOGIC: BOUNCY candidate. Score: ${score}, bouncyRand: ${bouncySpecificRand.toFixed(3)} (needs <0.15), Spacing OK.`); // Kept for now
+                    platformType = PLATFORM_TYPE_BOUNCY;
+                    lastSpecialPlatformY = newY; 
+                }
+                // Other special platforms
+                else if (score > SPIKY_PLATFORM_APPEAR_SCORE && generalRand < spikyChance && Math.abs(newY - lastSpecialPlatformY) > MIN_SPECIAL_PLATFORM_DISTANCE * gameScale) {
+                    platformType = PLATFORM_TYPE_SPIKY;
+                    lastSpecialPlatformY = newY;
+                    setTimeout(() => spawnPlatform(true), 50);
+                } else if (score > 800 && generalRand < challengingPlatformChance * 0.35 && Math.abs(newY - lastSpecialPlatformY) > (MIN_SPECIAL_PLATFORM_DISTANCE * gameScale) * 0.7) { 
+                    platformType = PLATFORM_TYPE_DISAPPEARING;
+                    lastSpecialPlatformY = newY;
+                } else if (score > 500 && generalRand < challengingPlatformChance * 0.75) { 
+                    platformType = PLATFORM_TYPE_MOVING;
+                } else if (score > 200 && generalRand < challengingPlatformChance) { 
+                    platformType = PLATFORM_TYPE_FRAGILE;
+                    lastSpecialPlatformY = newY;
+                } else {
+                    platformType = NORMAL_PLATFORM_TYPES[Math.floor(Math.random() * NORMAL_PLATFORM_TYPES.length)];
+                }
+            }
+            
+            const newPlatform = createPlatform(newX * gameScale, newY, newWidthBase, platformType);
+            if (newPlatform.hasPowerUp) playSound(powerupSpawnSound, "C5", "16n", 0.001 * spawnIndex); 
+            platforms.push(newPlatform);
+            nextPlatformY = newY; 
+        }
+
+
+        function updateGameElements(deltaTime) { 
+            platforms = platforms.filter(p => {
+                return p.y + p.height > cameraY - (canvas.height / gameScale) * 1.5 && !(p.type === PLATFORM_TYPE_FRAGILE && p.markedForRemoval);
+            });
+
+            platforms.forEach(p => {
+                if (p.type === PLATFORM_TYPE_MOVING) {
+                    p.x += (p.vx) * deltaTime * 60; 
+                    if (p.x <= p.originalX - p.moveRange || p.x >= p.originalX + p.moveRange) {
+                        p.vx *= -1; 
+                        p.x = Math.max(p.originalX - p.moveRange, Math.min(p.x, p.originalX + p.moveRange)); 
+                    }
+                } else if (p.type === PLATFORM_TYPE_FRAGILE && p.isBreaking) {
+                    if (p.opacity > 0.05) p.opacity -= 3 * deltaTime; 
+                    else p.opacity = 0.05;
+                } else if (p.type === PLATFORM_TYPE_SPIKY && p.isDisabled) {
+                    p.disabledTimer -= deltaTime * 1000;
+                    if (p.disabledTimer <= 0) {
+                        p.isDisabled = false; 
+                    }
+                } else if (p.type === PLATFORM_TYPE_DISAPPEARING) {
+                    p.timer += deltaTime * 1000;
+                    const cyclePosition = p.timer % DISAPPEARING_PLATFORM_CYCLE;
+                    p.isVisible = cyclePosition < DISAPPEARING_PLATFORM_ON_DURATION;
+                    if (p.isVisible && !p.soundPlayedOn) {
+                        playSound(disappearingPlatformSound, "C5", "32n");
+                        p.soundPlayedOn = true; p.soundPlayedOff = false;
+                    } else if (!p.isVisible && !p.soundPlayedOff) {
+                        playSound(disappearingPlatformSound, "C4", "32n");
+                        p.soundPlayedOff = true; p.soundPlayedOn = false;
+                    }
+                }
+
+                if (hedgehog.hasMagnet && p.hasStar) {
+                    const starCenterX = p.x + p.width / 2;
+                    const starCenterY = p.y - (STAR_Y_OFFSET_ABOVE_PLATFORM_BASE * gameScale);
+                    const hgCenterX = hedgehog.x + hedgehog.width / 2;
+                    const hgCenterY = hedgehog.y + hedgehog.height / 2;
+                    const dxStar = hgCenterX - starCenterX;
+                    const dyStar = hgCenterY - starCenterY;
+                    const distStar = Math.sqrt(dxStar * dxStar + dyStar * dyStar);
+
+                    if (distStar < MAGNET_RADIUS_BASE * gameScale) {
+                        p.hasStar = false; 
+                        processStarCollection(starCenterX, starCenterY, true);
+                    }
+                }
+            });
+
+            if (score > WIND_ZONE_SPAWN_SCORE && !windZoneActive && Math.random() < WIND_ZONE_CHANCE) {
+                windZoneActive = true;
+                currentWindForce = (Math.random() < 0.5 ? -1 : 1) * (MAX_WIND_FORCE_BASE * gameScale * (0.5 + Math.random() * 0.5));
+                windChangeTimer = Date.now() + WIND_DURATION_MIN + Math.random() * (WIND_DURATION_MAX - WIND_DURATION_MIN);
+                playSound(windSound); 
+                console.log("WIND ZONE ACTIVATED: Force", currentWindForce);
+            }
+            if (windZoneActive && Date.now() > windChangeTimer) {
+                windZoneActive = false;
+                currentWindForce = 0;
+                console.log("WIND ZONE DEACTIVATED");
+            }
+
+            if (buzzbugSpawnCooldown > 0) {
+                buzzbugSpawnCooldown -= deltaTime * 1000;
+            }
+            const currentBuzzbugSpawnChance = BUZZBUG_SPAWN_CHANCE_BASE + (score / 100000); 
+            if (score > BUZZBUG_SPAWN_SCORE && enemies.filter(e => e.type === 'buzzbug').length < MAX_BUZZBUGS_ON_SCREEN && buzzbugSpawnCooldown <= 0 && Math.random() < Math.min(currentBuzzbugSpawnChance, BUZZBUG_SPAWN_CHANCE_MAX)) {
+                spawnBuzzbug();
+                buzzbugSpawnCooldown = BUZZBUG_SPAWN_COOLDOWN_TIME;
+            }
+
+            if (eagleSpawnCooldown > 0) {
+                eagleSpawnCooldown -= deltaTime * 1000;
+            }
+             if (score > EAGLE_SPAWN_SCORE && enemies.filter(e => e.type === 'eagle').length < MAX_EAGLES && eagleSpawnCooldown <= 0 && Math.random() < EAGLE_SPAWN_CHANCE) {
+                console.log("Attempting to spawn Eagle.");
+                spawnEagle();
+                eagleSpawnCooldown = EAGLE_COOLDOWN_TIME;
+            }
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                enemies[i].update(deltaTime);
+                if (enemies[i].isOffScreen) { 
+                     if (enemies[i].type === 'buzzbug') buzzbugSpawnCooldown = BUZZBUG_SPAWN_COOLDOWN_TIME / 2; 
+                    else if (enemies[i].type === 'eagle') eagleSpawnCooldown = EAGLE_COOLDOWN_TIME / 2;
+                    enemies.splice(i, 1);
+                }
+            }
+
+            if (nextPlatformY > cameraY - (PLATFORM_SPAWN_MAX_Y_OFFSET_BASE * gameScale) - (canvas.height / gameScale) * 0.75) { 
+                 spawnPlatform();
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                if (typeof particles[i].update === 'function') {
+                    particles[i].update(deltaTime);
+                }
+                if (particles[i].life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+            if (starImgs.length > 0) { 
+                starAnimationTimer += deltaTime * STAR_ANIMATION_SPEED;
+                if (starAnimationTimer >= 1) {
+                    starAnimationTimer = 0;
+                    currentStarFrame = (currentStarFrame + 1) % starImgs.length;
+                }
+            }
+        }
+
+        function drawPlatformsAndStars() {
+            platforms.forEach(p => {
+                ctx.save();
+                let currentSprite = p.spriteImg; 
+
+                if (p.type === PLATFORM_TYPE_FRAGILE && p.isBreaking) {
+                    ctx.globalAlpha = Math.max(0, p.opacity);
+                } else if (p.type === PLATFORM_TYPE_DISAPPEARING) {
+                    ctx.globalAlpha = p.isVisible ? 1.0 : 0.3 + Math.sin(p.timer / 200) * 0.1;
+                    if (!p.isVisible && ctx.globalAlpha < 0.05) {
+                        ctx.restore();
+                        return; 
+                    }
+                } else {
+                    ctx.globalAlpha = 1.0; 
+                }
+
+                if (p.type === PLATFORM_TYPE_SPIKY) {
+                    currentSprite = p.isDisabled ? platformSpikesClosedImg : platformSpikesOpenImg;
+                }
+                
+                if (currentSprite && currentSprite.complete && currentSprite.naturalWidth !== 0) {
+                    ctx.drawImage(currentSprite, p.x, p.y, p.width, p.height);
+                } else if (p.colorSet) { 
+                    // console.warn("Platform sprite missing or not loaded, drawing fallback for type:", p.type, p.spriteImg); // Less verbose
+                    const colors = p.colorSet;
+                    ctx.fillStyle = colors.main;
+                    ctx.fillRect(p.x, p.y, p.width, p.height);
+                    if (colors.topDetail) { 
+                        ctx.fillStyle = colors.topDetail || colors.accent;
+                        ctx.fillRect(p.x, p.y, p.width, p.height * 0.25);
+                    }
+                } else {
+                    ctx.fillStyle = 'magenta'; 
+                    ctx.fillRect(p.x, p.y, p.width, p.height);
+                }
+                
+                ctx.restore(); 
+
+                if (p.hasStar) {
+                    const starCenterX = p.x + p.width / 2;
+                    const starCenterY = p.y - (STAR_Y_OFFSET_ABOVE_PLATFORM_BASE * gameScale); 
+                    const effectiveStarDisplaySize = STAR_DISPLAY_SIZE_BASE * gameScale;
+                    if (starImgs.length > 0 && starImgs[currentStarFrame]) {
+                        ctx.drawImage(starImgs[currentStarFrame], starCenterX - effectiveStarDisplaySize / 2, starCenterY - effectiveStarDisplaySize / 2, effectiveStarDisplaySize, effectiveStarDisplaySize);
+                    } else {
+                        drawCanvasStar(starCenterX, starCenterY, STAR_RADIUS_BASE * gameScale, STAR_POINTS, 0.45);
+                    }
+                }
+                if (p.hasPowerUp) {
+                    drawPowerUp(p.x + p.width / 2, p.y - (STAR_Y_OFFSET_ABOVE_PLATFORM_BASE * gameScale), p.powerUpType);
+                }
+            });
+        }
+        
+        function drawCanvasStar(cx, cy, radius, points, inset) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.translate(cx, cy);
+            ctx.moveTo(0, 0 - radius);
+            for (let i = 0; i < points; i++) {
+                ctx.rotate(Math.PI / points);
+                ctx.lineTo(0, 0 - (radius * inset));
+                ctx.rotate(Math.PI / points);
+                ctx.lineTo(0, 0 - radius);
+            }
+            ctx.closePath();
+            const glowAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.2;
+            ctx.shadowColor = STAR_COLOR_OUTER;
+            ctx.shadowBlur = 15 + Math.sin(Date.now() / 150) * 5;
+            
+            ctx.fillStyle = STAR_COLOR_OUTER;
+            ctx.fill();
+            
+            ctx.shadowBlur = 0; 
+            ctx.fillStyle = STAR_COLOR_INNER;
+            ctx.fill();
+
+            ctx.strokeStyle = STAR_OUTLINE_COLOR;
+            ctx.lineWidth = 1.5 * gameScale;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawPowerUp(cx, cy, type) {
+            const effectiveIconSize = POWERUP_ICON_SIZE_BASE * gameScale;
+            ctx.save();
+            ctx.translate(cx - effectiveIconSize / 2, cy - effectiveIconSize / 2); 
+            if (type === POWERUP_SHIELD) {
+                if (shieldIconImg && shieldIconImg.complete && shieldIconImg.naturalWidth !== 0) {
+                    ctx.drawImage(shieldIconImg, 0, 0, effectiveIconSize, effectiveIconSize);
+                } else { 
+                    ctx.fillStyle = SHIELD_POWERUP_COLOR;
+                    ctx.beginPath();
+                    ctx.moveTo(effectiveIconSize / 2, 0);
+                    ctx.quadraticCurveTo(0, 0, 0, effectiveIconSize / 2);
+                    ctx.quadraticCurveTo(0, effectiveIconSize, effectiveIconSize / 2, effectiveIconSize);
+                    ctx.quadraticCurveTo(effectiveIconSize, effectiveIconSize, effectiveIconSize, effectiveIconSize / 2);
+                    ctx.quadraticCurveTo(effectiveIconSize, 0, effectiveIconSize / 2, 0);
+                    ctx.fill();
+                    ctx.strokeStyle = 'white'; ctx.lineWidth = 2 * gameScale; ctx.stroke();
+                }
+            } else if (type === POWERUP_MAGNET) {
+                ctx.fillStyle = MAGNET_POWERUP_COLOR;
+                ctx.fillRect(0, effectiveIconSize * 0.2, effectiveIconSize * 0.3, effectiveIconSize * 0.8);
+                ctx.fillRect(effectiveIconSize * 0.7, effectiveIconSize * 0.2, effectiveIconSize * 0.3, effectiveIconSize * 0.8);
+                ctx.fillRect(effectiveIconSize * 0.15, 0, effectiveIconSize * 0.7, effectiveIconSize * 0.3);
+                ctx.fillStyle = 'white';
+                ctx.fillRect(effectiveIconSize * 0.05, effectiveIconSize * 0.8, effectiveIconSize * 0.2, effectiveIconSize * 0.15);
+                ctx.fillRect(effectiveIconSize * 0.75, effectiveIconSize * 0.8, effectiveIconSize * 0.2, effectiveIconSize * 0.15);
+            } else if (type === POWERUP_SUPER_JUMP) {
+                ctx.fillStyle = SUPER_JUMP_POWERUP_COLOR;
+                ctx.beginPath();
+                ctx.moveTo(effectiveIconSize * 0.5, 0);
+                ctx.quadraticCurveTo(effectiveIconSize * 0.1, effectiveIconSize * 0.4, effectiveIconSize * 0.5, effectiveIconSize);
+                ctx.quadraticCurveTo(effectiveIconSize * 0.9, effectiveIconSize * 0.4, effectiveIconSize * 0.5, 0);
+                ctx.fill();
+                ctx.strokeStyle = '#A1887F'; ctx.lineWidth = 1.5 * gameScale; ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function createParticleEffect(x, y, color = '#FFFFFF', count = 10, size = 2, speed = 2, life = 30, gravityFactor = 0.1) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    size: (Math.random() * size + 1) * gameScale,
+                    speedX: (Math.random() - 0.5) * speed * 2 * gameScale,
+                    speedY: (Math.random() - 0.5) * speed * 2 * gameScale - (speed / 2 * gameScale), 
+                    color: color,
+                    life: Math.random() * life + life / 2,
+                    gravity: gravityFactor * gameScale,
+                    opacity: 1,
+                    update: function(deltaTime) {
+                        this.x += this.speedX * deltaTime * 60;
+                        this.y += this.speedY * deltaTime * 60;
+                        this.speedY += this.gravity * deltaTime * 60;
+                        this.life -= deltaTime * 60;
+                        this.opacity = Math.max(0, this.life / (life * 1.5)); 
+                    },
+                    draw: function() {
+                        ctx.save();
+                        ctx.globalAlpha = this.opacity;
+                        ctx.fillStyle = this.color;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                });
+            }
+        }
+        function drawParticles() {
+            particles.forEach(p => p.draw());
+        }
+        
+        // --- Enemies ---
+        function spawnBuzzbug() {
+            const effectiveBuzzbugSize = BUZZBUG_SIZE_BASE * gameScale;
+            const side = Math.random() < 0.5 ? -effectiveBuzzbugSize : canvas.width; 
+            const yPos = cameraY + Math.random() * (canvas.height / gameScale) * 0.7 + (canvas.height / gameScale) * 0.1; 
+            const speedMultiplier = 0.8 + Math.random() * 0.4;
+            const vx = (side < 0 ? 1 : -1) * (BUZZBUG_SPEED_BASE * gameScale) * speedMultiplier; 
+            
+            const behaviorTypes = ['straight', 'swoop', 'hover_charge'];
+            const behaviorType = behaviorTypes[Math.floor(Math.random() * behaviorTypes.length)];
+            
+            const newBuzzbug = {
+                x: side, y: yPos,
+                width: effectiveBuzzbugSize, height: effectiveBuzzbugSize * 0.7,
+                vx: vx, vy: 0, 
+                type: 'buzzbug', 
+                behaviorType: behaviorType,
+                swoopAmplitude: (15 + Math.random() * 20) * gameScale * (Math.random() < 0.5 ? 1 : -1), 
+                swoopFrequency: 0.03 + Math.random() * 0.03, 
+                swoopTimer: 0, 
+                hoverTargetX: (canvas.width / gameScale) / 2 + (Math.random() - 0.5) * ((canvas.width / gameScale) * 0.3), 
+                hoverDuration: 1000 + Math.random() * 1000, 
+                hoverTimer: 0, 
+                isHovering: false, 
+                hasCharged: false, 
+                wingFlapTimer: 0,
+                wingFlapSpeed: 15 + Math.random() * 10,
+                wingState: 0,
+                originalColor: BUZZBUG_BODY_COLOR,
+                isWarning: false, 
+                warningTimer: 0,
+                isOffScreen: false,
+
+                update: function(deltaTime) {
+                    if (this.behaviorType === 'swoop') {
+                        this.swoopTimer += this.swoopFrequency * deltaTime * 60;
+                        this.vy = Math.sin(this.swoopTimer) * this.swoopAmplitude * 0.1; 
+                        this.y += this.vy;
+                    } else if (this.behaviorType === 'hover_charge') {
+                        if (!this.isHovering && !this.hasCharged) {
+                            const targetDx = this.hoverTargetX - (this.x + this.width / 2);
+                            if (Math.abs(targetDx) > Math.abs(this.vx)) {
+                                this.x += this.vx * deltaTime * 60;
+                            } else {
+                                this.x = this.hoverTargetX - this.width / 2;
+                                this.isHovering = true;
+                                this.hoverTimer = Date.now();
+                                this.isWarning = true; 
+                                this.warningTimer = Date.now();
+                            }
+                        } else if (this.isHovering) {
+                            if (Date.now() - this.warningTimer > 150) {
+                                this.originalColor = this.originalColor === BUZZBUG_BODY_COLOR ? BUZZBUG_HOVER_WARN_COLOR : BUZZBUG_BODY_COLOR;
+                                this.warningTimer = Date.now();
+                            }
+                            if (Date.now() - this.hoverTimer > this.hoverDuration) {
+                                this.isHovering = false;
+                                this.hasCharged = true;
+                                this.vx *= 2.5; 
+                                this.originalColor = BUZZBUG_BODY_COLOR; 
+                                this.isWarning = false;
+                            }
+                        }
+                    }
+                    if (!this.isHovering) {
+                         this.x += this.vx * deltaTime * 60;
+                    }
+
+                    this.wingFlapTimer += deltaTime * this.wingFlapSpeed;
+                    if (this.wingFlapTimer >= 1) {
+                        this.wingFlapTimer = 0;
+                        this.wingState = (this.wingState + 1) % 2;
+                    }
+                    this.isOffScreen = (this.x + this.width < -50 || this.x > canvas.width + 50 || this.y > cameraY + (canvas.height / gameScale) + 100 || this.y + this.height < cameraY - 100);
+
+                },
+                draw: function() {
+                    ctx.fillStyle = this.isWarning ? BUZZBUG_HOVER_WARN_COLOR : this.originalColor;
+                    ctx.beginPath();
+                    ctx.ellipse(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, this.height / 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = BUZZBUG_WING_COLOR;
+                    const wingWidth = this.width * 0.7;
+                    const wingHeight = this.height * 0.5;
+                    const wingYOffset = this.wingState === 0 ? -wingHeight * 0.3 : wingHeight * 0.1;
+                    ctx.beginPath();
+                    ctx.ellipse(this.x + this.width * 0.25, this.y + this.height * 0.3 + wingYOffset, wingWidth / 2, wingHeight / 2, -Math.PI / 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.ellipse(this.x + this.width * 0.75, this.y + this.height * 0.3 + wingYOffset, wingWidth / 2, wingHeight / 2, Math.PI / 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#FF0000'; 
+                    ctx.beginPath(); ctx.arc(this.x + this.width * 0.35, this.y + this.height*0.4, 2 * gameScale,0,Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(this.x + this.width * 0.65, this.y + this.height*0.4, 2 * gameScale,0,Math.PI*2); ctx.fill();
+                }
+            };
+            enemies.push(newBuzzbug);
+        }
+
+        function spawnEagle() { 
+            const effectiveEagleWidth = EAGLE_WIDTH_BASE * gameScale;
+            const effectiveEagleHeight = EAGLE_HEIGHT_BASE * gameScale;
+            const side = Math.random() < 0.5 ? -effectiveEagleWidth : canvas.width; 
+            const yPos = cameraY + (Math.random() * (canvas.height / gameScale) * 0.6) + ((canvas.height / gameScale) * 0.1);
+            const vx = (side < 0 ? 1 : -1) * (EAGLE_SPEED_BASE * gameScale) * (0.9 + Math.random() * 0.3);
+            
+            const newEagle = {
+                x: side, y: yPos,
+                width: effectiveEagleWidth, height: effectiveEagleHeight,
+                vx: vx, vy: 0, 
+                type: 'eagle',
+                swoopAmplitude: (3 + Math.random() * 7) * gameScale, 
+                swoopFrequency: 0.02 + Math.random() * 0.02,
+                swoopTimer: Math.random() * Math.PI * 2, 
+                isOffScreen: false,
+                wingFlapTimer: Math.random() * 10,
+                wingFlapSpeed: 6 + Math.random() * 4, 
+                wingState: 0,
+
+                update: function(deltaTime) {
+                    this.x += this.vx * deltaTime * 60;
+                    this.swoopTimer += this.swoopFrequency * deltaTime * 60;
+                    this.vy = Math.sin(this.swoopTimer) * this.swoopAmplitude * 0.05; 
+                    this.y += this.vy;
+
+                    this.wingFlapTimer += deltaTime * this.wingFlapSpeed;
+                    if (this.wingFlapTimer >= 1) {
+                        this.wingFlapTimer = 0;
+                        this.wingState = (this.wingState + 1) % 2;
+                    }
+                    
+                    this.isOffScreen = (this.x > canvas.width + this.width * 2 || this.x + this.width < -this.width * 2 || 
+                                        this.y > cameraY + (canvas.height / gameScale) + this.height * 2 || this.y + this.height < cameraY - this.height * 2);
+                    if(this.isOffScreen) console.log("Eagle culled (flew off screen)");
+                },
+                draw: function() {
+                    ctx.save();
+                    ctx.fillStyle = EAGLE_BODY_COLOR;
+                    ctx.beginPath();
+                    ctx.ellipse(this.x + this.width / 2, this.y + this.height / 2, this.width / 2.2, this.height / 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = EAGLE_WING_COLOR;
+                    const wingBaseY = this.y + this.height * 0.45;
+                    const wingOuterYOffset = this.wingState === 0 ? -this.height * 0.15 : this.height * 0.1; 
+
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + this.width * 0.4, wingBaseY); 
+                    ctx.quadraticCurveTo(this.x - this.width * 0.1, wingBaseY + wingOuterYOffset - this.height*0.1, 
+                                         this.x - this.width * 0.4, wingBaseY + this.height*0.2); 
+                    ctx.lineTo(this.x + this.width * 0.4, wingBaseY + this.height * 0.3); 
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + this.width * 0.6, wingBaseY); 
+                    ctx.quadraticCurveTo(this.x + this.width * 1.1, wingBaseY + wingOuterYOffset - this.height*0.1, 
+                                         this.x + this.width * 1.4, wingBaseY + this.height*0.2); 
+                    ctx.lineTo(this.x + this.width * 0.6, wingBaseY + this.height * 0.3); 
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    ctx.fillStyle = EAGLE_BEAK_COLOR;
+                    ctx.beginPath();
+                    const beakXOffset = this.vx > 0 ? this.width * 0.4 : this.width * 0.1; 
+                    ctx.moveTo(this.x + this.width / 2 + beakXOffset, this.y + this.height * 0.4); 
+                    ctx.lineTo(this.x + this.width / 2 + beakXOffset + (this.vx > 0 ? 10 : -10) * gameScale , this.y + this.height * 0.5);
+                    ctx.lineTo(this.x + this.width / 2 + beakXOffset, this.y + this.height * 0.6);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.restore();
+                }
+            };
+            enemies.push(newEagle);
+            console.log("EAGLE SPAWNED:", newEagle);
+        }
+
+
+        function drawEnemies() {
+            enemies.forEach(enemy => enemy.draw());
+        }
+
+        function processStarCollection(starCenterX, starCenterY, collectedByMagnet = false) {
+            score += STAR_SCORE;
+            const currentTime = Date.now();
+            if (currentTime - lastStarCollectTime < COMBO_WINDOW) {
+                comboCounter++;
+            } else {
+                comboCounter = 1; 
+            }
+            lastStarCollectTime = currentTime;
+
+            if (comboCounter >= 2) {
+                score += COMBO_BONUS_POINTS * (comboCounter -1) ; 
+                showComboPopup(comboCounter);
+                playSound(comboSound);
+            } else {
+                playSound(collectStarSound);
+            }
+            createParticleEffect(starCenterX, starCenterY, STAR_COLOR_OUTER, 20, 4 * gameScale, 3.5 * gameScale, 45, 0.02 * gameScale);
+        }
+
+
+        // Updated checkCollisions function with stricter horizontal check and cleaned logs
+        function checkCollisions() {
+            let landedOnPlatformThisFrame = false;
+            hedgehog.currentPlatform = null; 
+            const effectiveStarRadius = STAR_RADIUS_BASE * gameScale;
+            const effectiveIconSize = POWERUP_ICON_SIZE_BASE * gameScale;
+
+            platforms.forEach(platform => {
+                if (platform.type === PLATFORM_TYPE_DISAPPEARING && !platform.isVisible) {
+                    // Skip collision for invisible disappearing platforms
+                } else if (hedgehog.dy >= 0 && 
+                    hedgehog.x + hedgehog.width * 0.15 < platform.x + platform.width &&  // Stricter: from 0.10 to 0.15
+                    hedgehog.x + hedgehog.width * 0.85 > platform.x &&                   // Stricter: from 0.90 to 0.85
+                    hedgehog.y + hedgehog.height >= platform.y &&
+                    hedgehog.y + hedgehog.height <= platform.y + platform.height + hedgehog.dy + 4 * gameScale 
+                ) {
+                    hedgehog.y = platform.y - hedgehog.height;
+                    hedgehog.dy = 0;
+                    hedgehog.onGround = true;
+                    landedOnPlatformThisFrame = true;
+                    hedgehog.currentPlatform = platform; 
+                    
+                    const particleColor = platform.colorSet ? platform.colorSet.detail : '#FFFFFF';
+                    playSound(landSound);
+                    createParticleEffect(hedgehog.x + hedgehog.width / 2, hedgehog.y + hedgehog.height, particleColor, 8, 3 * gameScale);
+
+                    if (platform.type === PLATFORM_TYPE_SPIKY && !platform.isDisabled) {
+                        if (hedgehog.hasShield) {
+                            hedgehog.hasShield = false;
+                            platform.isDisabled = true;
+                            platform.disabledTimer = 2000; 
+                            playSound(shieldDeflectSound);
+                            playSound(breakSound); 
+                            createParticleEffect(hedgehog.x + hedgehog.width / 2, platform.y, platform.colorSet ? platform.colorSet.accent : '#F44336', 20, 4 * gameScale);
+                            hedgehog.jump((HEDGEHOG_JUMP_FORCE_BASE * gameScale) * 0.8); 
+                            console.log("Shield protected from spikes!");
+                        } else {
+                            playSound(hurtSound);
+                            setGameState('gameOver'); 
+                            return; 
+                        }
+                    } else if (platform.type === PLATFORM_TYPE_BOUNCY) {
+                        const bouncyJumpForce = HEDGEHOG_BOUNCY_JUMP_FORCE_BASE * gameScale;
+                        console.log("BOUNCY PLATFORM HIT! Applying jump force:", bouncyJumpForce, "Current platform type:", platform.type); // Kept for one last check
+                        hedgehog.jump(bouncyJumpForce); 
+                        playSound(bouncyLandSound);
+                        createParticleEffect(hedgehog.x + hedgehog.width / 2, platform.y, platform.colorSet ? platform.colorSet.accent : '#69F0AE', 20, 5 * gameScale, 3.5 * gameScale);
+                    } else if (platform.type === PLATFORM_TYPE_FRAGILE && !platform.isBreaking) {
+                        platform.isBreaking = true;
+                        platform.opacity = 1.0; 
+                        platform.breakTimer = setTimeout(() => {
+                            platform.markedForRemoval = true; 
+                            playSound(breakSound);
+                            createParticleEffect(platform.x + platform.width/2, platform.y + platform.height/2, platform.colorSet ? platform.colorSet.detail : '#E65100', 30, 4 * gameScale, 2.8 * gameScale, 0.05 * gameScale);
+                        }, FRAGILE_PLATFORM_BREAK_DELAY);
+                        hedgehog.jump(); 
+                    } else if (platform.type !== PLATFORM_TYPE_FRAGILE || !platform.isBreaking) {
+                         hedgehog.jump(); 
+                    }
+                }
+
+                if (platform.hasStar) { 
+                    const starCenterX = platform.x + platform.width / 2;
+                    const starCenterY = platform.y - (STAR_Y_OFFSET_ABOVE_PLATFORM_BASE * gameScale); 
+                    const distX = (hedgehog.x + hedgehog.width / 2) - starCenterX;
+                    const distY = (hedgehog.y + hedgehog.height / 2) - starCenterY;
+                    const distance = Math.sqrt(distX * distX + distY * distY);
+                    if (distance < hedgehog.width / 2 + effectiveStarRadius) { 
+                        platform.hasStar = false; 
+                        processStarCollection(starCenterX, starCenterY, false);
+                    }
+                }
+                if (platform.hasPowerUp && platform.powerUpType === POWERUP_SHIELD) {
+                    const powerUpCenterX = platform.x + platform.width / 2;
+                    const powerUpCenterY = platform.y - (STAR_Y_OFFSET_ABOVE_PLATFORM_BASE * gameScale); 
+                    const distPX = (hedgehog.x + hedgehog.width / 2) - powerUpCenterX;
+                    const distPY = (hedgehog.y + hedgehog.height / 2) - powerUpCenterY;
+                    const distanceP = Math.sqrt(distPX * distPX + distPY * distPY);
+                     if (distanceP < hedgehog.width / 2 + effectiveIconSize / 2) { 
+                        platform.hasPowerUp = false;
+                        hedgehog.activateShield();
+                    }
+                }
+                 if (platform.hasPowerUp && platform.powerUpType === POWERUP_MAGNET) {
+                    const powerUpCenterX = platform.x + platform.width / 2;
+                    const powerUpCenterY = platform.y - (STAR_Y_OFFSET_ABOVE_PLATFORM_BASE * gameScale);
+                    const distPX = (hedgehog.x + hedgehog.width / 2) - powerUpCenterX;
+                    const distPY = (hedgehog.y + hedgehog.height / 2) - powerUpCenterY;
+                    const distanceP = Math.sqrt(distPX * distPX + distPY * distPY);
+                     if (distanceP < hedgehog.width / 2 + effectiveIconSize / 2) { 
+                        platform.hasPowerUp = false;
+                        hedgehog.activateMagnet();
+                    }
+                }
+                if (platform.hasPowerUp && platform.powerUpType === POWERUP_SUPER_JUMP) {
+                    const powerUpCenterX = platform.x + platform.width / 2;
+                    const powerUpCenterY = platform.y - (STAR_Y_OFFSET_ABOVE_PLATFORM_BASE * gameScale);
+                    const distPX = (hedgehog.x + hedgehog.width / 2) - powerUpCenterX;
+                    const distPY = (hedgehog.y + hedgehog.height / 2) - powerUpCenterY;
+                    const distanceP = Math.sqrt(distPX * distPX + distPY * distPY);
+                    if (distanceP < hedgehog.width / 2 + effectiveIconSize / 2) {
+                        platform.hasPowerUp = false;
+                        hedgehog.activateSuperJump();
+                    }
+                }
+            });
+
+            enemies.forEach((enemy, index) => {
+                if (hedgehog.x < enemy.x + enemy.width &&
+                    hedgehog.x + hedgehog.width > enemy.x &&
+                    hedgehog.y < enemy.y + enemy.height &&
+                    hedgehog.y + hedgehog.height > enemy.y) {
+                    
+                    if (hedgehog.hasShield) {
+                        hedgehog.hasShield = false;
+                        enemies.splice(index, 1); 
+                        playSound(shieldDeflectSound);
+                        if (enemy.type === 'buzzbug') playSound(buzzbugZapSound);
+                        else if (enemy.type === 'eagle') playSound(buzzbugZapSound); 
+                        createParticleEffect(enemy.x + enemy.width/2, enemy.y + enemy.height/2, enemy.type === 'buzzbug' ? BUZZBUG_WING_COLOR : EAGLE_WING_COLOR, 25, 4 * gameScale);
+                        console.log("Shield protected from enemy!");
+                    } else {
+                        playSound(hurtSound);
+                        setGameState('gameOver');
+                    }
+                }
+            });
+
+            if (!landedOnPlatformThisFrame && hedgehog.dy > 0) { 
+                 hedgehog.onGround = false;
+            }
+        }
+
+        // --- Camera & Scrolling ---
+        function updateCamera() { 
+            const targetCameraY = hedgehog.y - (canvas.height / gameScale) * 0.28; 
+            cameraY += (targetCameraY - cameraY) * 0.07; 
+            if (hedgehog.y < maxReachedY) {
+                score += Math.floor((maxReachedY - hedgehog.y) / (8 / gameScale) ); 
+                maxReachedY = hedgehog.y;
+            }
+        }
+
+        // --- Parallax Background & Wind Particles ---
+        function drawWindParticles() {
+            if (!windZoneActive || Math.abs(currentWindForce) < 0.05 * gameScale) return;
+
+            ctx.save();
+            ctx.globalAlpha = 0.5 + Math.random() * 0.2; 
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; 
+
+            for (let i = 0; i < 10; i++) { 
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height; 
+                const length = (20 + Math.random() * 30) * gameScale; 
+                const thickness = (1.5 + Math.random() * 1.5) * gameScale; 
+                
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x - currentWindForce * (120 / gameScale) - (Math.random()-0.5)*15 * gameScale, y + (Math.random()-0.5)*8 * gameScale); 
+                ctx.lineWidth = thickness;
+                ctx.strokeStyle = ctx.fillStyle; 
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+
+        // --- Sound Management ---
+        async function initAudio() {
+            try {
+                console.log("AUDIO: Initializing audio players...");
+                jumpSound = new Tone.Synth({ oscillator: { type: "sine", detune:-700 }, envelope: { attack: 0.003, decay: 0.07, sustain: 0.001, release: 0.1 }, volume: -6 }).toDestination();
+                landSound = new Tone.MembraneSynth({ pitchDecay: 0.06, octaves: 1.5, envelope: { attack: 0.001, decay: 0.06, sustain: 0 }, volume: -13 }).toDestination();
+                bouncyLandSound = new Tone.Synth({ oscillator: { type: "fatsquare", spread:10, count:3 }, envelope: { attack: 0.005, decay: 0.35, sustain: 0.02, release: 0.3 }, filter:{type:"bandpass", Q:1.5, frequency:1200}, volume: -4 }).toDestination();
+                breakSound = new Tone.NoiseSynth({ noise: { type: "white", playbackRate: 0.4 }, envelope: { attack: 0.005, decay: 0.35, sustain: 0 }, filter: {type: "lowpass", Q:1, frequency: 600}, volume: -7 }).toDestination();
+                gameOverSound = new Tone.Synth({ oscillator: { type: "fatsawtooth", count:5, spread: 50 }, envelope: { attack: 0.02, decay: 1.5, sustain: 0, release: 0.6 }, volume: -2 }).toDestination();
+                collectStarSound = new Tone.Synth({ oscillator: {type: "fmtriangle", harmonicity: 2.5, modulationType: "triangle", detune:1200}, envelope: {attack: 0.001, decay: 0.3, sustain: 0.01, release: 0.45}, volume: -4 }).toDestination();
+                walkSound = new Tone.PluckSynth({ attackNoise: 0.7, dampening: 8000, resonance: 0.7, volume: -35 }).toDestination();
+                shieldActivateSound = new Tone.Synth({ oscillator: {type: "fatsine", count: 4, spread: 50}, envelope: {attack:0.01, decay:0.7, sustain:0.3, release:0.5}, volume: -6}).toDestination();
+                shieldBreakSound = new Tone.Synth({ oscillator: {type: "pulse", width: 0.7}, envelope: {attack:0.02, decay:0.5, sustain:0, release:0.2}, filter: {type:"lowpass", Q:1.5, frequency: 500}, volume: -8}).toDestination();
+                powerupSpawnSound = new Tone.Synth({oscillator: {type: "triangle"}, envelope: {attack: 0.03, decay:0.5, sustain:0.02, release:0.3}, volume: -10}).toDestination();
+                hurtSound = new Tone.Synth({oscillator: {type: "square", detune: -200}, envelope: {attack:0.005, decay:0.15, sustain:0, release: 0.15}, volume: -7}).toDestination();
+                shieldDeflectSound = new Tone.MetalSynth({frequency: 200, envelope: {attack:0.002, decay:0.25, release:0.15}, harmonicity: 4.1, modulationIndex:20, octaves:0.8, volume: -9}).toDestination();
+                magnetActivateSound = new Tone.Synth({oscillator: {type: "sawtooth"}, envelope: {attack:0.01, decay:0.4, sustain:0.1, release:0.2}, filter:{type:"bandpass", Q:2, frequency:800}, volume: -12}).toDestination();
+                buzzbugZapSound = new Tone.NoiseSynth({noise:{type:"white", playbackRate:1.2}, envelope:{attack:0.001, decay:0.08, sustain:0}, filter:{type:"highpass", Q:1, frequency:2000}, volume: -9}).toDestination();
+                disappearingPlatformSound = new Tone.Synth({oscillator:{type:"sine", detune: 700}, envelope:{attack:0.005, decay:0.03, sustain:0.005, release:0.05}, volume: -22}).toDestination();
+                superJumpCollectSound = new Tone.Synth({ oscillator: { type: "triangle8" }, envelope: { attack: 0.01, decay: 0.4, sustain: 0.01, release: 0.2 }, volume: -5 }).toDestination();
+                superJumpUseSound = new Tone.Synth({ oscillator: { type: "pwm", modulationFrequency: 0.2 }, envelope: { attack: 0.02, decay: 0.7, sustain: 0, release: 0.3 }, volume: -3 }).toDestination();
+                windSound = new Tone.NoiseSynth({ noise: { type: "pink" }, envelope: { attack: 0.5, decay: 1.5, sustain: 0.8, release: 0.5 }, volume: -25 }).toDestination(); 
+                comboSound = new Tone.Synth({ oscillator: { type: "fatsawtooth", count:3, spread:20 }, envelope: { attack: 0.01, decay: 0.15, sustain: 0.05, release: 0.2 }, volume: -8 }).toDestination();
+
+                ambientMusic = new Tone.Loop(time => {
+                    const notes = ["C2", "D#2", "G2", "A#2", "C3", "D#3", "G3"];
+                    const note = notes[Math.floor(Math.random() * notes.length)];
+                    const synth = new Tone.FMSynth({
+                        harmonicity: 1.5,
+                        modulationIndex: 5,
+                        detune: 0,
+                        oscillator: { type: "sine" },
+                        envelope: { attack: 0.4, decay: 0.8, sustain: 0.5, release: 2 },
+                        modulation: { type: "square" },
+                        modulationEnvelope: { attack: 0.3, decay: 0.6, sustain: 0.4, release: 1.5 },
+                        volume: -35 
+                    }).toDestination();
+                    synth.triggerAttackRelease(note, "1m", time);
+                    Tone.Transport.scheduleOnce(() => synth.dispose(), time + Tone.Time("1m").toSeconds() + 0.5);
+                }, "2m").start(0); 
+
+                console.log("AUDIO: Synthesized audio players ready.");
+            } catch (error) {
+                console.error("AUDIO: Error initializing synthesized audio players:", error);
+                const noopSound = { triggerAttackRelease: () => {} };
+                jumpSound = landSound = bouncyLandSound = breakSound = gameOverSound = collectStarSound = walkSound = shieldActivateSound = shieldBreakSound = powerupSpawnSound = hurtSound = shieldDeflectSound = magnetActivateSound = buzzbugZapSound = disappearingPlatformSound = superJumpCollectSound = superJumpUseSound = windSound = comboSound = noopSound;
+            }
+        }
+        function playSound(soundPlayer, note = "C4", duration = "8n", delay = 0) { 
+            if (!soundPlayer || !Tone.context || Tone.context.state !== 'running') return; 
+            const playTime = Tone.now() + delay + (Math.random() * 0.002); 
+            if (soundPlayer.triggerAttackRelease) { 
+                 if (soundPlayer === collectStarSound) {
+                    soundPlayer.triggerAttackRelease("C6", "16n", playTime);
+                    soundPlayer.triggerAttackRelease("G6", "16n", playTime + 0.06);
+                    soundPlayer.triggerAttackRelease("E7", "16n", playTime + 0.12);
+                 } else if (soundPlayer === comboSound) {
+                    soundPlayer.triggerAttackRelease("E5", "16n", playTime);
+                    soundPlayer.triggerAttackRelease("A5", "16n", playTime + 0.08);
+                 } else if (soundPlayer === landSound) {
+                    soundPlayer.triggerAttackRelease("A1", "16n", playTime);
+                 } else if (soundPlayer === bouncyLandSound) {
+                    soundPlayer.triggerAttackRelease("B4", "8n", playTime);
+                 } else if (soundPlayer === breakSound || soundPlayer === walkSound || soundPlayer === buzzbugZapSound) {
+                    soundPlayer.triggerAttackRelease("16n", playTime); 
+                 } else if (soundPlayer === shieldActivateSound || soundPlayer === magnetActivateSound) {
+                    soundPlayer.triggerAttackRelease("G4", "0.4n", playTime);
+                 } else if (soundPlayer === shieldBreakSound || soundPlayer === hurtSound) {
+                    soundPlayer.triggerAttackRelease("C3", "0.25n", playTime);
+                 } else if (soundPlayer === powerupSpawnSound) {
+                    soundPlayer.triggerAttackRelease("F#5", "0.15n", playTime);
+                 } else if (soundPlayer === shieldDeflectSound) {
+                    soundPlayer.triggerAttack(playTime);
+                 } else if (soundPlayer === disappearingPlatformSound) {
+                    soundPlayer.triggerAttackRelease(note, "32n", playTime); 
+                 } else if (soundPlayer === windSound) {
+                    soundPlayer.triggerAttackRelease("4n", playTime); 
+                 }
+                 else {
+                    soundPlayer.triggerAttackRelease(note, duration, playTime);
+                 }
+            }
+        }
+
+        // --- Game Loop & State Management ---
+        function gameLoop(currentTime) {
+            gameLoopRequestId = requestAnimationFrame(gameLoop);
+            const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1); 
+            lastTime = currentTime;
+
+            if (gameState === 'playing') { 
+                hedgehog.update(deltaTime);
+                updateGameElements(deltaTime); 
+                checkCollisions();
+                updateCamera(); 
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.save();
+                ctx.translate(0, -cameraY); 
+                drawPlatformsAndStars();
+                drawEnemies(); 
+                drawParticles(); 
+                hedgehog.draw();
+                ctx.restore(); 
+
+                if (windZoneActive) {
+                    drawWindParticles();
+                }
+
+                scoreDisplay.textContent = `Score: ${score}`;
+
+                if (powerUpTimerDisplayElement) {
+                    let timerText = "";
+                    if (hedgehog.hasShield && hedgehog.shieldTimer > 0) {
+                        timerText += `Shield: ${(hedgehog.shieldTimer / 1000).toFixed(1)}s `;
+                    }
+                    if (hedgehog.hasMagnet && hedgehog.magnetTimer > 0) {
+                        timerText += `Magnet: ${(hedgehog.magnetTimer / 1000).toFixed(1)}s`;
+                    }
+                    if (hedgehog.hasNextJumpSuper) {
+                        timerText += " Super Jump Ready! ";
+                    }
+                    if (timerText) {
+                        powerUpTimerDisplayElement.textContent = timerText.trim();
+                        powerUpTimerDisplayElement.classList.remove('hidden');
+                    } else {
+                        powerUpTimerDisplayElement.classList.add('hidden');
+                    }
+                }
+
+                if (hedgehog.y > cameraY + (canvas.height / gameScale) + hedgehog.height * 2) { 
+                    setGameState('gameOver');
+                }
+            }
+        }
+
+        function showComboPopup(count) {
+            if (!comboPopupElement) return;
+            comboPopupElement.textContent = `COMBO ${count}X!`;
+            comboPopupElement.classList.add('show');
+            
+            if (comboPopupTimeout) clearTimeout(comboPopupTimeout);
+            comboPopupTimeout = setTimeout(() => {
+                comboPopupElement.classList.remove('show');
+            }, 1000); 
+        }
+
+        function setGameState(newState) {
+            console.log(`GAME: Setting state to ${newState}.`);
+            gameState = newState; 
+            startScreen.classList.toggle('hidden', newState !== 'start');
+            gameOverScreen.classList.toggle('hidden', newState !== 'gameOver');
+            scoreDisplay.classList.toggle('hidden', newState !== 'playing');
+            touchLeft.classList.toggle('hidden', newState !== 'playing');
+            touchRight.classList.toggle('hidden', newState !== 'playing');
+            powerUpTimerDisplayElement.classList.toggle('hidden', newState !== 'playing' || (!hedgehog.hasShield && !hedgehog.hasMagnet && !hedgehog.hasNextJumpSuper));
+
+            if (newState === 'start') { 
+                highScoreDisplayStart.textContent = `High Score: ${highScore}`;
+                highScoreDisplayStart.classList.remove('hidden');
+                if (Tone.Transport.state === "started") Tone.Transport.pause();
+            }
+            else if (newState === 'playing') {
+                highScoreDisplayStart.classList.add('hidden');
+                resetGame(); 
+                if (Tone.Transport.state !== "started" && ambientMusic) Tone.Transport.start();
+                if (!gameLoopRequestId) { lastTime = performance.now(); gameLoop(lastTime); }
+            } else if (newState === 'gameOver') {
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('hedgehogJumpHighScore', highScore);
+                }
+                finalScoreDisplay.textContent = `Your Score: ${score}`;
+                highScoreDisplayGameOver.textContent = `High Score: ${highScore}`;
+                playSound(gameOverSound, "C2", "0.6n"); 
+                if (Tone.Transport.state === "started") Tone.Transport.pause();
+            }
+        }
+        function resetGame() {
+            console.log("GAME: Resetting game.");
+            score = 0; 
+            cameraY = 0; 
+            
+            hedgehog.visualState = 'idle'; 
+            hedgehog.currentFrameIndex = 0;
+            hedgehog.animationTimer = 0;
+            hedgehog.currentPlatform = null;
+            hedgehog.hasShield = false;
+            hedgehog.shieldTimer = 0;
+            hedgehog.hasMagnet = false;
+            hedgehog.magnetTimer = 0;
+            hedgehog.hasNextJumpSuper = false;
+            
+            particles = []; 
+            enemies = [];
+            windZoneActive = false; 
+            currentWindForce = 0;
+            windChangeTimer = 0;
+            buzzbugSpawnCooldown = 0; 
+            eagleSpawnCooldown = 0; 
+            comboCounter = 0;
+            lastStarCollectTime = 0;
+            if(comboPopupTimeout) clearTimeout(comboPopupTimeout);
+            if(comboPopupElement) comboPopupElement.classList.remove('show');
+
+            platforms.forEach(p => {
+                if (p.type === PLATFORM_TYPE_FRAGILE && p.breakTimer) {
+                    clearTimeout(p.breakTimer);
+                    p.breakTimer = null;
+                }
+            });
+            platforms = []; 
+            generateInitialPlatforms(); 
+            
+            if (platforms.length > 0 && platforms[0].isFirst) {
+                 hedgehog.x = platforms[0].x + (platforms[0].width / 2) - (hedgehog.width / 2);
+                 hedgehog.y = platforms[0].y - hedgehog.height;
+                 hedgehog.dy = 0;
+                 hedgehog.onGround = true;
+            } else {
+                hedgehog.x = canvas.width / 2 - hedgehog.width / 2;
+                hedgehog.y = canvas.height - 100 - hedgehog.height; 
+                hedgehog.dy = 0;
+                hedgehog.onGround = true; 
+                console.error("RESET_GAME: No first platform found after generation. Placing hedgehog at default bottom.");
+            }
+
+            cameraY = hedgehog.y - (canvas.height / gameScale) * 0.28; 
+            maxReachedY = hedgehog.y; 
+
+            scoreDisplay.textContent = `Score: ${score}`;
+        }
+
+        // --- Asset Loading ---
+        function loadImage(src) {
+            return new Promise((resolve) => {
+                if (!src) { 
+                    resolve(null);
+                    return;
+                }
+                const img = new Image(); img.crossOrigin = "Anonymous";
+                img.onload = () => { 
+                    // console.log(`ASSETS: Successfully loaded image: ${src}`); // Less verbose
+                    resolve(img); 
+                };
+                img.onerror = (errEvent) => { 
+                    console.warn(`ASSETS: Failed to load image: ${src}. Error type: ${errEvent.type}`);
+                    resolve(null); 
+                };
+                img.src = src;
+            });
+        }
+        async function loadAssets() { 
+            console.log("ASSETS: Loading all visual assets...");
+            try {
+                const platformImagePromises = [
+                    loadImage(PLATFORM_SPRITE_GRASS_URL),
+                    loadImage(PLATFORM_SPRITE_STONE_URL),
+                    loadImage(PLATFORM_SPRITE_WOODEN_URL),
+                    loadImage(PLATFORM_SPRITE_JUMPING_URL),
+                    loadImage(PLATFORM_SPRITE_MOVING_URL),
+                    loadImage(PLATFORM_SPRITE_FRAGILE_URL),
+                    loadImage(PLATFORM_SPRITE_GLASS_URL),
+                    loadImage(PLATFORM_SPRITE_SPIKES_OPEN_URL),
+                    loadImage(PLATFORM_SPRITE_SPIKES_CLOSED_URL)
+                ];
+
+                const results = await Promise.all([
+                    loadImage(HEDGEHOG_SPRITE_URL),
+                    loadImage(SHIELD_ICON_URL),
+                    ...STAR_SPRITE_URLS.map(loadImage),
+                    ...platformImagePromises 
+                ]);
+                
+                let currentIndex = 0;
+                hedgehogImg = results[currentIndex++];
+                shieldIconImg = results[currentIndex++];
+                starImgs = results.slice(currentIndex, currentIndex + STAR_SPRITE_URLS.length).filter(img => img !== null); 
+                currentIndex += STAR_SPRITE_URLS.length;
+
+                platformGrassImg = results[currentIndex++];
+                platformStoneImg = results[currentIndex++];
+                platformWoodenImg = results[currentIndex++];
+                platformJumpingImg = results[currentIndex++];
+                platformMovingImg = results[currentIndex++];
+                platformFragileImg = results[currentIndex++];
+                platformGlassImg = results[currentIndex++];
+                platformSpikesOpenImg = results[currentIndex++];
+                platformSpikesClosedImg = results[currentIndex++];
+
+
+                if (!hedgehogImg) console.error("ASSETS: CRITICAL - Hedgehog sprite failed to load!");
+                // Removed individual platform sprite load checks for brevity, assuming they load or fallback is handled
+                
+                console.log("ASSETS: Visual assets loading process completed.");
+            } catch (error) { 
+                console.error("ASSETS: Unexpected error in loadAssets:", error, error.stack);
+                // Ensure variables are defined even if loading fails
+                if (typeof hedgehogImg === 'undefined') hedgehogImg = null; 
+                if (typeof shieldIconImg === 'undefined') shieldIconImg = null;
+                if (typeof starImgs === 'undefined') starImgs = [];
+                platformGrassImg = platformGrassImg || null;
+                platformStoneImg = platformStoneImg || null;
+                platformWoodenImg = platformWoodenImg || null;
+                platformJumpingImg = platformJumpingImg || null;
+                platformMovingImg = platformMovingImg || null;
+                platformFragileImg = platformFragileImg || null;
+                platformGlassImg = platformGlassImg || null;
+                platformSpikesOpenImg = platformSpikesOpenImg || null;
+                platformSpikesClosedImg = platformSpikesClosedImg || null;
+            }
+        }
+
+
+        // --- Initialization ---
+        function resizeCanvas() {
+            if (!canvas) {
+                // console.error("INIT_ERROR: resizeCanvas called before canvas element is available."); // Less verbose
+                return;
+            }
+            canvas.width = Math.min(window.innerWidth, 700); 
+            canvas.height = window.innerHeight * 0.95; 
+
+            gameScale = canvas.height / REFERENCE_GAME_HEIGHT;
+            gameScale = Math.min(1.2, Math.max(0.5, gameScale)); 
+
+            HEDGEHOG_WIDTH = (SPRITE_FRAME_WIDTH - 2 * SPRITE_PADDING_X) * HEDGEHOG_RENDER_SCALE_BASE * gameScale;
+            HEDGEHOG_HEIGHT = (SPRITE_FRAME_HEIGHT - 2 * SPRITE_PADDING_Y) * HEDGEHOG_RENDER_SCALE_BASE * gameScale;
+            hedgehog.width = HEDGEHOG_WIDTH;
+            hedgehog.height = HEDGEHOG_HEIGHT;
+
+             if ( (gameState === 'playing' || gameState === 'gameOver' || (platforms && platforms.length > 0)) && platforms && platforms.length > 0) { 
+                if (platforms[0].isFirst) { 
+                    platforms[0].x = (canvas.width / 2) - (platforms[0].width / 2); 
+                    if (hedgehog.onGround && hedgehog.y + hedgehog.height >= platforms[0].y && hedgehog.y + hedgehog.height <= platforms[0].y + platforms[0].height) {
+                         hedgehog.x = platforms[0].x + (platforms[0].width / 2) - (hedgehog.width / 2);
+                    }
+                }
+            }
+        }
+        async function init() {
+            console.log("INIT: Initializing game...");
+            try {
+                canvas = document.getElementById('gameCanvas');
+                if (!canvas) throw new Error("INIT_ERROR: Canvas element 'gameCanvas' not found!");
+                ctx = canvas.getContext('2d');
+                if (!ctx) throw new Error("INIT_ERROR: Failed to get 2D context from canvas!");
+                
+                startScreen = document.getElementById('startScreen');
+                gameOverScreen = document.getElementById('gameOverScreen');
+                scoreDisplay = document.getElementById('scoreDisplay');
+                finalScoreDisplay = document.getElementById('finalScore');
+                highScoreDisplayStart = document.getElementById('highScoreDisplayStart');
+                highScoreDisplayGameOver = document.getElementById('highScoreDisplayGameOver');
+                startGameButton = document.getElementById('startGameButton');
+                playAgainButton = document.getElementById('playAgainButton');
+                touchLeft = document.getElementById('touchLeft');
+                touchRight = document.getElementById('touchRight');
+                gameContainer = document.getElementById('gameContainer'); 
+                powerUpTimerDisplayElement = document.getElementById('powerUpTimerDisplay'); 
+                comboPopupElement = document.getElementById('comboPopup'); 
+
+                if (!startGameButton || !playAgainButton) throw new Error("INIT_ERROR: Start or Play Again button not found!");
+
+                resizeCanvas(); 
+                window.addEventListener('resize', resizeCanvas);
+                window.addEventListener('keydown', handleKeyDown);
+                window.addEventListener('keyup', handleKeyUp);
+                touchLeft.addEventListener('touchstart', handleTouchStart, { passive: false });
+                touchLeft.addEventListener('touchend', handleTouchEnd, { passive: false });
+                touchLeft.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+                touchRight.addEventListener('touchstart', handleTouchStart, { passive: false });
+                touchRight.addEventListener('touchend', handleTouchEnd, { passive: false });
+                touchRight.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+                await loadAssets(); 
+                await initAudio();
+
+                startGameButton.addEventListener('click', async () => {
+                    try {
+                        if (Tone.context.state !== 'running') {
+                            await Tone.start(); 
+                        }
+                        setGameState('playing');
+                    } catch (error) {
+                        console.error("BUTTON_CLICK_HANDLER_ERROR (Start Game):", error);
+                        setGameState('playing'); 
+                    }
+                });
+                playAgainButton.addEventListener('click', () => {
+                    setGameState('playing');
+                });
+
+                setGameState('start');
+                lastTime = performance.now();
+                gameLoop(lastTime);
+                console.log("INIT: Game initialized and game loop started.");
+
+            } catch (error) {
+                console.error("CRITICAL_INIT_ERROR_CAUGHT:", error.name, error.message, error.stack);
+                const errorDisplayDiv = document.getElementById('criticalErrorDisplay');
+                if (errorDisplayDiv) {
+                    errorDisplayDiv.textContent = `Critical Initialization Error:\n${error.name}: ${error.message}\n\nStack:\n${error.stack}`;
+                    errorDisplayDiv.classList.remove('hidden');
+                } else {
+                    alert(`Critical Initialization Error (error display div not found):\n${error.name}: ${error.message}`);
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM: DOMContentLoaded event fired.");
+            init();
+        });
+    </script>
+</body>
+</html>
